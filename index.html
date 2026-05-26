@@ -13,7 +13,7 @@
 <meta http-equiv="Expires" content="0">
 <script>
 // Auto-update: bump APP_VERSION every deploy to force reload on all devices
-var APP_VERSION = '2026-05-23-v11';
+var APP_VERSION = '2026-05-23-v12';
 var stored = localStorage.getItem('nestflow_app_version');
 if (stored && stored !== APP_VERSION) {
   localStorage.setItem('nestflow_app_version', APP_VERSION);
@@ -2166,7 +2166,8 @@ function saveTransaction() {
     d.wfBalance[mk2] += amount;
   }
 
-  d.transactions.push({name,amount,date,category,subfact,source,bucket,note,type:'expense',id:Date.now()});
+  const status = (source === 'Wells Fargo' || source === 'WF') ? 'pending' : 'paid';
+  d.transactions.push({name,amount,date,category,subfact,source,bucket,note,type:'expense',status,id:Date.now()});
   saveData(d);
   closeModal();
   showToast('"' + name + '" agregado ✓','success');
