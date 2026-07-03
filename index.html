@@ -648,9 +648,9 @@ var DEFAULT_FIXED_PAYMENTS = [
   {id:'fp7', name:'Medical Cash',     amount:100,  day:15,account:'Betterment',period:'Q1',variable:false},
   {id:'fp8', name:'Emergency Fund',   amount:100,  day:15,account:'Betterment',period:'Q1',variable:false},
   {id:'fp9', name:'House Payment',    amount:220,  day:15,account:'Betterment',period:'Q1',variable:false},
-  {id:'fp10',name:'Gym',              amount:25,   day:17,account:'Betterment',period:'Q1',variable:false},
-  {id:'fp11',name:'Subaru',           amount:530,  day:20,account:'Betterment',period:'Q1',variable:false},
-  {id:'fp12',name:'Allowance Monica', amount:100,  day:15,account:'Betterment',period:'Q1',variable:false},
+  {id:'fp10',name:'Gym',              amount:25.05,day:17,account:'Betterment',period:'Q1',variable:false},
+  {id:'fp11',name:'Subaru',           amount:530,  day:21,account:'Betterment',period:'Q1',variable:false},
+  {id:'fp12',name:'Allowance Monica', amount:100,  day:15,account:'Betterment',period:'Q1',variable:true},
   // Q1 facturas que llegan a WF (pero se pagan con Betterment)
   {id:'fp13',name:'Sewer',            amount:50,   day:11,account:'Wells Fargo',period:'Q1',variable:false},
   {id:'fp14',name:'Mediacom',         amount:96,   day:11,account:'Wells Fargo',period:'Q1',variable:false},
@@ -662,7 +662,7 @@ var DEFAULT_FIXED_PAYMENTS = [
   {id:'fp21',name:'Car Insurance',    amount:125,  day:1, account:'Betterment',period:'Q2',variable:false},
   {id:'fp22',name:'Emergency Fund',   amount:100,  day:1, account:'Betterment',period:'Q2',variable:false},
   {id:'fp23',name:'Gas Reserve',      amount:200,  day:1, account:'Betterment',period:'Q2',variable:false},
-  {id:'fp24',name:'Rent',             amount:880,  day:2, account:'Betterment',period:'Q2',variable:false},
+  {id:'fp24',name:'Rent',             amount:880,  day:1, account:'Betterment',period:'Q2',variable:false},
   {id:'fp25',name:'Offering',         amount:100,  day:6, account:'Betterment',period:'Q2',variable:false},
   {id:'fp26',name:'Filipinas',        amount:670,  day:1, account:'Betterment',period:'Q2',variable:false},
   // Q2 facturas que llegan a WF (pero se pagan con Betterment)
@@ -708,7 +708,6 @@ function getData() {
         'Immigration Fees': {monthly:250, total:0,color:'#fbbf24',history:[]},
         'Emergency Fund':   {monthly:200, total:0,color:'#34d399',history:[]},
         'Medical Cash':     {monthly:100, total:0,color:'#fb923c',history:[]},
-        'Maintenance':      {monthly:100, total:0,color:'#a78bfa',history:[]},
         'Vacation Fund':    {monthly:100, total:0,color:'#2dd4bf',history:[]},
         'Clothing':         {monthly:50,  total:0,color:'#fb7185',history:[]},
         'Food Extra':       {monthly:0,   total:0,color:'#f59e0b',history:[]},
@@ -717,7 +716,6 @@ function getData() {
         'Car Maintenance':  {monthly:100, total:0,color:'#84cc16',history:[]},
         'Gas Reserve':      {monthly:200, total:0,color:'#f97316',history:[]},
         'Food Reserve':     {monthly:600, total:0,color:'#22c55e',history:[]},
-        'Reserva BofA':     {monthly:165, total:0,color:'#3b82f6',history:[]},
       }
     };
     saveData(d);
@@ -736,10 +734,10 @@ function getData() {
   var DEFAULT_BUCKETS = {
     'Savi':             {monthly:100, total:0,color:'#f472b6',history:[]},
     'House Downpayment':{monthly:100, total:0,color:'#60a5fa',history:[]},
+    'House Payment':    {monthly:220, total:0,color:'#38bdf8',history:[]},
     'Immigration Fees': {monthly:250, total:0,color:'#fbbf24',history:[]},
     'Emergency Fund':   {monthly:200, total:0,color:'#34d399',history:[]},
     'Medical Cash':     {monthly:100, total:0,color:'#fb923c',history:[]},
-    'Maintenance':      {monthly:100, total:0,color:'#a78bfa',history:[]},
     'Vacation Fund':    {monthly:100, total:0,color:'#2dd4bf',history:[]},
     'Clothing':         {monthly:50,  total:0,color:'#fb7185',history:[]},
     'Food Extra':       {monthly:0,   total:0,color:'#f59e0b',history:[]},
@@ -748,11 +746,19 @@ function getData() {
     'Car Maintenance':  {monthly:100, total:0,color:'#84cc16',history:[]},
     'Gas Reserve':      {monthly:200, total:0,color:'#f97316',history:[]},
     'Food Reserve':     {monthly:600, total:0,color:'#22c55e',history:[]},
-    'Reserva BofA':     {monthly:165, total:0,color:'#3b82f6',history:[]},
   };
   Object.keys(DEFAULT_BUCKETS).forEach(function(k){
     if (!d.savings[k]) d.savings[k] = DEFAULT_BUCKETS[k];
   });
+  // Migración v24: eliminar buckets que el usuario ya no quiere.
+  // 'Maintenance' es duplicado de 'Car Maintenance'; 'Reserva BofA' y su lógica BofA ya no se usan.
+  try {
+    if (!localStorage.getItem('fh_migrated_v24_buckets')) {
+      ['Maintenance','Reserva BofA'].forEach(function(b){ if (d.savings && d.savings[b]) delete d.savings[b]; });
+      localStorage.setItem('fh_migrated_v24_buckets','1');
+      saveData(d);
+    }
+  } catch(e){}
   return d;
 }
 
@@ -1434,33 +1440,23 @@ function renderBettermentCard() {
   if (restante !== null) {
     var rColor = restante>=0 ? 'var(--green)' : 'var(--red)';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border)">'
-      + '<div><div style="font-size:12px;color:var(--text2)">Restante del ciclo</div>'
-      + '<div style="font-size:10px;color:var(--text3)">Cheques '+fmt(cycleIncome)+' − Fijos '+fmt(fixedOut)+'</div></div>'
+      + '<div><div style="font-size:12px;color:var(--text2)">💰 Extra del ciclo</div>'
+      + '<div style="font-size:10px;color:var(--text3)">Cheques '+fmt(cycleIncome)+' − todos los bills y buckets '+fmt(fixedOut)+'</div></div>'
       + '<div style="font-family:DM Mono,monospace;font-size:15px;font-weight:700;color:'+rColor+'">'+fmt(restante)+'</div>'
       + '</div>';
     if (restante >= 0) {
-      html += '<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Puedes mover '+fmt(restante)+' a Emergency Fund</div>';
+      html += '<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 '+fmt(restante)+' libre para pagar cosas pendientes o mover a un bucket</div>';
     } else {
       html += '<div style="font-size:11px;color:var(--red);margin-top:4px">⚠️ Déficit de '+fmt(Math.abs(restante))+' — guarda de un cheque o usa un bucket</div>';
     }
   } else {
-    html += '<div style="font-size:11px;color:var(--text3);padding:8px 0;border-top:1px solid var(--border)">Registra los cheques de este ciclo para ver tu restante</div>';
+    html += '<div style="font-size:11px;color:var(--text3);padding:8px 0;border-top:1px solid var(--border)">Registra los cheques de este ciclo para ver tu extra</div>';
   }
 
   // Gasto variable del ciclo
   html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)">'
     + '<div style="font-size:11px;color:var(--text3)">🛒 Gastado este ciclo ('+cycleTxs.length+')</div>'
     + '<div style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(varSpent)+'</div>'
-    + '</div>';
-
-  var rbBal = (d.savings && d.savings['Reserva BofA'] && d.savings['Reserva BofA'].total) || 0;
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px;border-top:1px solid var(--border)">'
-    + '<div style="font-size:11px;color:var(--text3)">🏧 BofA (para budget)</div>'
-    + '<div style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">'+fmt(bofaBal)+'</div>'
-    + '</div>';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px">'
-    + '<div style="font-size:11px;color:var(--text3)">💙 Reserva BofA (apartado p/ Q2)</div>'
-    + '<div style="font-family:DM Mono,monospace;font-size:12px;color:'+(rbBal>=165?'var(--green)':'var(--yellow)')+'">'+fmt(rbBal)+' / $165</div>'
     + '</div>';
 
   return html + '</div>';
@@ -3371,7 +3367,7 @@ function checkAutoTransfers() {
     var dateStr=today.toISOString().split('T')[0];
     var MAP={
       'Savi':'Savi',
-      'House Downpayment':'House Downpayment','House Payment':'House Downpayment',
+      'House Downpayment':'House Downpayment','House Payment':'House Payment',
       'Immigration Fees':'Immigration Fees',
       'Medical Cash':'Medical Cash',
       'Emergency Fund':'Emergency Fund',
@@ -3396,32 +3392,16 @@ function checkAutoTransfers() {
     if(d.accounts&&d.accounts['Betterment'])
       d.accounts['Betterment'].balance=Math.max(0,(d.accounts['Betterment'].balance||0)-total);
 
-    // Reserva BofA: solo día 16 se aparta $165 (para cubrir déficit BofA del Q2)
-    if (day===16) {
-      if(!d.savings['Reserva BofA']) d.savings['Reserva BofA']={monthly:165,total:0,color:'#3b82f6',history:[]};
-      var rb = d.savings['Reserva BofA'];
-      if ((rb.total||0) < 165) {
-        var add = 165 - (rb.total||0);
-        rb.total = 165;
-        rb.history = rb.history||[];
-        rb.history.push({date:dateStr, amount:add, note:'Auto día 16 — para BofA Q2'});
-        if(d.accounts&&d.accounts['Betterment'])
-          d.accounts['Betterment'].balance=Math.max(0,(d.accounts['Betterment'].balance||0)-add);
-        applied.push('Reserva BofA '+fmt(add));
-        total += add;
-      }
-    }
-
     saveData(d); localStorage.setItem(key,'1');
     showTransferBanner(total,applied,day);
   } catch(e){console.warn('autoTransfer',e);}
 }
 
 // Buckets reales (acumulan dinero). El resto de pagos fijos de Betterment son gastos que SALEN.
-var BUCKET_NAMES_SET = ['Savi','House Downpayment','Immigration Fees',
-  'Medical Cash','Emergency Fund','Car Maintenance','Maintenance',
+var BUCKET_NAMES_SET = ['Savi','House Downpayment','House Payment','Immigration Fees',
+  'Medical Cash','Emergency Fund','Car Maintenance',
   'Car Insurance','Mint Mobile','Gas Reserve','Food Reserve',
-  'Vacation Fund','Clothing','Food Extra','Reserva BofA'];
+  'Vacation Fund','Clothing','Food Extra'];
 
 // Descuenta de Betterment los gastos fijos REALES (Rent, Filipinas, Offering, Subaru, Gym...)
 // cuyas fechas ya pasaron este mes. Solo de hoy en adelante (no toca el pasado).
